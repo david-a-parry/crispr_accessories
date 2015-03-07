@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+#This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 #TO DO - CHECK WHETHER PAM SITE IS INTRONIC
 #ALLOW FOR INTRONIC MUTATIONS
 use strict;
@@ -672,7 +674,9 @@ sub usage {
         print "ERROR: $msg\n\n";
     }
     print <<EOT;
-    Usage: $0 -g <crispr genbank file> -t <refseq transcript id> -c <coding position> -m <mutation>  [options]
+    Produces suitable guide sequence oligos and repair templates for homology directed repair using output from the Zhang lab CRISPR designing software http://crispr.mit.edu/.
+    
+    Usage: perl $0 -g <crispr genbank file> -t <refseq transcript id> -c <coding position> -m <mutation>  [options]
     
     Options:
     
@@ -689,8 +693,13 @@ sub usage {
     -b    --build           [genome build to use. Default = hg19]
     -h    --help            [show this help message and exit] 
 
+Copyright 2015  David A. Parry
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 EOT
     exit 1 if $msg;
     exit;
 }
+
 

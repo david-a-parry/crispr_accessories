@@ -25,6 +25,7 @@ my $f_prefix = "CACC"; #5' restriction site compatible addition to forward guide
 my $r_prefix = "AAAC"; #5' restriction site compatible addition to rev guide
 my $extra_bases = "G"
   ; #extra bases to add after prefix of forward guide and at 3' end of rev guide
+my $splice_distance = 8; #print a warning if PAM site mutation in repair template is within this many bp of a splice site
 my $build  = 'hg19';
 my %codons = (
     AAA => "K",
@@ -105,6 +106,7 @@ GetOptions(
     "p|forward_prefix=s" => \$f_prefix,
     "reverse_prefix=s"   => \$r_prefix,
     "extra=s"            => \$extra_bases,
+    "distance=i"         => \$splice_distance,
     "build=s"            => \$build,
     "help"               => \$help,
 ) or usage("Error retriveing user options.");
@@ -118,8 +120,15 @@ usage("--mutation argument is required.\n")   if not $mut;
 check_mutation($mut);
 my %transcript = get_gene_coordinates($transcript);
 my $pos_coord = get_cdna_genomic_coordinate( \%transcript, $pos, $int_pos );
-print
-"$transcript{id}: c.$pos matches genomic coordinate $transcript{chrom}:$pos_coord\n";
+print "$transcript{id}: c.$pos"; 
+if ($int_pos){
+    if ($int_pos > 0){
+        print "+$int_pos";
+    }else{
+        print "$int_pos";
+    }
+}
+print " matches genomic coordinate $transcript{chrom}:$pos_coord\n";
 my $stream_obj = Bio::SeqIO->new(
     -file   => "<$gb",
     -format => "genbank",
@@ -341,12 +350,21 @@ sub get_repair_template {
             }
             elsif ( is_intronic( $t, $g ) ) {
                 my ( $c_pos, $i_pos ) = get_intronic_position( $t, $g );
+                my $coord_string = "c.$c_pos";
+                if ($i_pos > 0){
+                    $coord_string .= "+$i_pos";
+                }else{
+                    $coord_string .= "$i_pos";
+                }
                 my $m = 'A';    #arbitrarily change to an A
-                my $nt = substr( $mod_dna, $g - $dna_start, 1, uc($m) );
+                my $nt = uc(substr( $mod_dna, $g - $dna_start, 1, uc($m) ));
                 die "ERROR - PAM position is not a G/C! "
                   if lc($nt) ne 'g' and lc($nt) ne 'c';
+                if (abs($i_pos) <= $splice_distance){
+                    print "WARNING - intronic PAM site mutation is only " . abs($i_pos) . " away from a splice site!\n";
+                }
                 print
-"Changing $t->{chrom}:$g from $nt to $m (TO DO - GET INTRONIC DESCRIPTION)\n";
+"Changing $t->{chrom}:$g from $nt to $m ($coord_string$nt>$m) for intronic PAM site mutation of repair template.\n";
                 return substr( $mod_dna, $min - $dna_start, $max - $min );
             }
             else {              #intergenic?
@@ -360,9 +378,9 @@ sub get_repair_template {
           if lc($nt) ne 'g' and lc($nt) ne 'c';
         my $aa = $codons{ uc($codon) };
         my $gc = $nt eq 'g' ? 'c' : 'g';
-        for my $m ( "a", $gc, "t" ) {
+        for my $m ( "A", uc($gc), "T" ) {
             my $mut_codon   = $codon;
-            my $changed_cds = substr( $mut_codon, $codon_pos - 1, 1, $m );
+            my $changed_cds = uc(substr( $mut_codon, $codon_pos - 1, 1, $m ));
             my $m_aa        = $codons{ uc($mut_codon) };
             if ( $m_aa eq $aa )
             { #hooray - we've got a synonymous change to the PAM site for our template
@@ -371,8 +389,12 @@ sub get_repair_template {
                     $g_m = revcomp($g_m);
                 }
                 my $changed_base =
-                  substr( $mod_dna, $g - $dna_start, 1, uc($g_m) );
+                  uc(substr( $mod_dna, $g - $dna_start, 1, uc($g_m) ));
                 my $changed_c = get_coding_pos( $t, $g );
+                my $distance_from_splice = get_exonic_distance_from_splice($t, $g);
+                if ($distance_from_splice <= $splice_distance){
+                    print "WARNING - exonic PAM site mutation is only $distance_from_splice away from a splice site!\n";
+                }
                 print
 "Changing $t->{chrom}:$g from $changed_base to $g_m (c.$changed_c"
                   . $changed_cds
@@ -383,11 +405,45 @@ sub get_repair_template {
     }
     return;
 }
+
+############################################
+sub get_exonic_distance_from_splice{
+    my ($t, $g_pos) = @_; 
+    for ( my $i = 0 ; $i < @{ $t->{starts} } -1 ; $i++ ) {
+        if ($g_pos >= $t->{starts}->[$i] and $g_pos <= $t->{ends}->[$i]){
+            my $acc_distance = $g_pos - $t->{starts}->[$i] ;
+            my $don_distance = $t->{ends}->[$i] - $g_pos + 1;
+            return $acc_distance > $don_distance ? $don_distance : $acc_distance;
+        }
+    }
+    die "Error getting $g_pos distance from splice site - is $g_pos exonic?\n";
+}
 ############################################
 sub get_intronic_position {
     my ( $t, $g_pos ) = @_;
-
-    #TO DO!
+    #returns coding coordinate and relative intronic coordinate
+    for ( my $i = 0 ; $i < @{ $t->{starts} } -1 ; $i++ ) {
+        if ( $g_pos >= $t->{ends}->[$i] && $g_pos < $t->{starts}->[$i+1] ) {
+            my $intron_pos;
+            my $exon_pos;
+            my $donor_pos = $g_pos - $t->{ends}->[$i];
+            my $acceptor_pos = $t->{starts}->[$i+1] - $g_pos + 1;
+            if (abs($donor_pos) > abs($acceptor_pos)){
+                $intron_pos =  $acceptor_pos;
+                $exon_pos = $t->{starts}->[$i+1];
+            }else{
+                $intron_pos = $donor_pos;
+                $exon_pos = $t->{ends}->[$i];
+            }
+            my $c_pos = get_coding_pos($t, $exon_pos); 
+            
+            if ( $t->{strand} eq '-' ) {
+                $intron_pos *= -1;
+            }
+            return ($c_pos, $intron_pos); 
+        }
+    }
+    die "Can't get intronic position for $g_pos for $t->{id} - is this coordinate really intronic?\n";
 }
 ############################################
 sub get_codon {
@@ -442,9 +498,62 @@ sub is_coding {
     return 0;
 }
 ############################################
+sub get_utr_pos {
+    my ($t, $g_pos) = @_; 
+    my $u_pos;
+    my $utr_length;  
+    if ($g_pos < $t->{cdsStart}){
+        for ( my $i = 0 ; $i < @{ $t->{starts} } ; $i++ ) {
+            last if $t->{starts}->[$i] > $t->{cdsStart};#exon is in cds
+            if ($t->{ends}->[$i] < $t->{cdsStart}){#whole exon is pre cds
+                my $exon_length = $t->{ends}->[$i] - $t->{starts}->[$i];
+                $utr_length += $exon_length;
+                if ($g_pos > $t->{ends}->[$i]){
+                    $u_pos += $exon_length;
+                }elsif($g_pos >= $t->{starts}->[$i]){
+                    $u_pos += $g_pos - $t->{starts}->[$i];
+                }
+            }else{#cds start is in exon
+                $utr_length += $t->{cdsStart} - $t->{starts}->[$i];
+                if ($g_pos >= $t->{starts}->[$i]){
+                    $u_pos += $g_pos - $t->{starts}->[$i];
+                }
+                last; 
+            }
+        }
+        $u_pos = $utr_length - $u_pos;
+    }else{
+        for ( my $i = 0 ; $i < @{ $t->{starts} } ; $i++ ) {
+            next if $t->{ends}->[$i] < $t->{cdsEnd};#exon is before or within cds
+            if ($t->{starts}->[$i] > $t->{cdsEnd}){#whole exon is post cds
+                my $exon_length = $t->{ends}->[$i] - $t->{starts}->[$i];
+                $utr_length += $exon_length;
+                if ($g_pos > $t->{ends}->[$i]){
+                    $u_pos += $exon_length;
+                }elsif($g_pos >= $t->{starts}->[$i]){
+                    $u_pos += $g_pos - $t->{starts}->[$i];
+                }
+            }else{#cds end is in exon
+                $utr_length += $t->{ends}->[$i] - $t->{cdsEnd};
+                if ($g_pos >= $t->{cdsEnd}){
+                    $u_pos += $g_pos - $t->{cdsEnd};
+                }
+                last; 
+            }
+        }
+    }
+    if ( $t->{strand} eq '-' ) {
+        $u_pos *= -1;
+    }
+    if ($u_pos > 0){
+        $u_pos = "*$u_pos";
+    }
+    return $u_pos;
+}
+############################################
 sub get_coding_pos {
     my ( $t, $g_pos ) = @_;
-    return 0 if not is_coding( $t, $g_pos );
+    return get_utr_pos($t, $g_pos) if not is_coding( $t, $g_pos );
     my @cds = get_cds($t);
     my $pos = 0;
     for ( my $i = 0 ; $i < @cds - 1 ; $i += 2 ) {
@@ -690,6 +799,7 @@ sub usage {
     -p    --forward_prefix  [sequence to prepend to forward guide. Default = CACC]
     -r    --reverse_prefix  [sequence to prepend to reverse guide. Default = AAAC]
     -e    --extra           [add this extra seq after the forward prefix to the forward guide and reverse complement to the 3' end of the reverse guide. Default = G]
+    -d    --distance        [print a warning message if PAM site mutation is this many bp or less away from a splice site. Default is 8.]
     -b    --build           [genome build to use. Default = hg19]
     -h    --help            [show this help message and exit] 
 

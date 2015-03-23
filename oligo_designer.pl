@@ -253,7 +253,7 @@ foreach my $id ( sort { $guides{$b}->{pam_dist} <=> $guides{$a}->{pam_dist} }
     my $r_seq = revcomp($f_seq);
     print "Forward Guide: $f_prefix$extra_bases$f_seq\n";
     print "Reverse Guide: $r_prefix"
-      . ( revcomp( $r_seq ) )
+      . $r_seq 
       . ( revcomp($extra_bases) ) . "\n";
 
     #print Dumper %guides;

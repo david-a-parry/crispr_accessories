@@ -247,9 +247,13 @@ foreach my $id ( sort { $guides{$b}->{pam_dist} <=> $guides{$a}->{pam_dist} }
     print "Guide $id:\nPAM distance is $guides{$id}->{pam_dist} from "
       . " $pos_coord at $guides{$id}->{pam_coord}\n";
     print "Score = $guides{$id}->{score}\n";
-    print "Forward Guide: $f_prefix$extra_bases$guides{$id}->{seq}\n";
+    
+    #remove PAM site from oligo
+    (my $f_seq = $guides{$id}->{seq}) =~ s/[ATCG]GG$//;
+    my $r_seq = revcomp($f_seq);
+    print "Forward Guide: $f_prefix$extra_bases$f_seq\n";
     print "Reverse Guide: $r_prefix"
-      . ( revcomp( $guides{$id}->{seq} ) )
+      . ( revcomp( $r_seq ) )
       . ( revcomp($extra_bases) ) . "\n";
 
     #print Dumper %guides;

@@ -196,15 +196,27 @@ sub usage {
         print "ERROR: $msg\n\n";
     }
     print <<EOT;
-    Usage: perl  $0 -t <refseq transcript id> -c <coding position> [options]
+    Usage: $0 -t <refseq transcript id> -c <coding position> [options]
     
     Options:
     
     -t    --transcript      [RefSeq transcript ID of your target gene]
     -c    --coordinate      [cDNA position in transcript to mutate]
     -i    --intron_position [give this value in conjunction with -c to give intron/UTR position if your change is not coding]
-    -f    --flanks          [amount of bp flanks to retrieve either side of cDNA coordinate]
+    -f    --flanks          [amount of bp flanks to retrieve either side of cDNA coordinate (default = 30)]
+    -b    --build           [genome build to use. Default = hg19]
     -h    --help            [show this help message and exit] 
+
+    Examples: 
+
+    $0 -t NM_006077 -c 1078 
+    #to retrieve DNA corresponding to c.1078 (and 30 bp flanking sequence)
+
+    $0 -t NM_006077 -c 1078 -i -1 
+    #to retrieve DNA corresponding to c.1078-1 (and 30 bp flanking sequence)
+
+    $0 -t NM_000492 -c 3963 -i 1 -f 60
+    #to retrieve DNA corresponding to c.3963+1 and 60 bp flanking sequence
 
 Copyright 2015  David A. Parry
 

@@ -789,7 +789,7 @@ sub usage {
     print <<EOT;
     Produces suitable guide sequence oligos and repair templates for homology directed repair using output from the Zhang lab CRISPR designing software http://crispr.mit.edu/.
     
-    Usage: perl $0 -g <crispr genbank file> -t <refseq transcript id> -c <coding position> -m <mutation>  [options]
+    Usage: $0 -g <crispr genbank file> -t <refseq transcript id> -c <coding position> -m <mutation>  [options]
     
     Options:
     
@@ -797,7 +797,7 @@ sub usage {
     -g    --genbank         [genbank file for guide RNAs produced by http://crispr.mit.edu/]
     -s    --score           [minimum guide RNA score to consider. Default = 50]
     -c    --coordinate      [cDNA position in transcript to mutate]
-    -i    --intron_position [give this value in conjunction with -c to give intron/UTR position if your change is not coding]
+    -i    --intron_position [give this value in conjunction with -c to give intron/UTR position if your change is not coding (e.g. if mutation is c.100-1 use -c 100 and -i -1]
     -m    --mutation        [mutation to introduce. Only SNVs supported.]
     -f    --flanks          [size of repair template flanks. Default = 60]
     -p    --forward_prefix  [sequence to prepend to forward guide. Default = CACC]
